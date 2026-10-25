@@ -210,8 +210,8 @@ elif st.session_state.role in ["COUNTRY_HEAD", "STATE_HEAD", "ZONAL_MANAGER", "S
             n_user = st.text_input("Username")
             n_pass = st.text_input("Password", type="password")
             
-            # Store Type Selection added here for Retailers
-            n_store_type = st.selectbox("Store System Type (If Retailer)", ["SINGLE", "ENTERPRISE"], index=0, help="Select Single Store or Enterprise Multi-System Billing")
+            # Explicit Store Type selector for Retailer
+            n_store_type = st.selectbox("Store System Type (Select 'ENTERPRISE' for Multi-System)", ["SINGLE", "ENTERPRISE"])
             
             n_gstin = st.text_input("GSTIN Number (if Retailer)", value="27AAAAA0000A1Z5")
             if st.form_submit_button("Create Node"):
