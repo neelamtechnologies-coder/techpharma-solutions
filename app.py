@@ -110,8 +110,8 @@ if st.session_state.role == "SUPER_ADMIN":
         else:
             st.info("No hierarchy nodes created yet.")
         
-        all_rets = pd.read_sql_query("SELECT id, assigned_sse_id, store_name, owner_name, gstin, subscription_status, payment_status FROM retailers;", conn)
-        st.markdown("### All Retailers (with GSTIN)")
+        all_rets = pd.read_sql_query("SELECT id, assigned_sse_id, store_name, owner_name, gstin, subscription_status, payment_status, store_type FROM retailers;", conn)
+        st.markdown("### All Retailers (with Store Type & GSTIN)")
         if not all_rets.empty:
             st.dataframe(all_rets, use_container_width=True)
         else:
@@ -209,12 +209,16 @@ elif st.session_state.role in ["COUNTRY_HEAD", "STATE_HEAD", "ZONAL_MANAGER", "S
             n_phone = st.text_input("Phone")
             n_user = st.text_input("Username")
             n_pass = st.text_input("Password", type="password")
+            
+            # Store Type Selection added here for Retailers
+            n_store_type = st.selectbox("Store System Type (If Retailer)", ["SINGLE", "ENTERPRISE"], index=0, help="Select Single Store or Enterprise Multi-System Billing")
+            
             n_gstin = st.text_input("GSTIN Number (if Retailer)", value="27AAAAA0000A1Z5")
             if st.form_submit_button("Create Node"):
                 c = conn.cursor()
                 try:
                     if n_role == "RETAILER":
-                        c.execute("INSERT INTO retailers (assigned_sse_id, store_name, owner_name, email, phone, username, password_hash, store_type, subscription_status, payment_status, gstin) VALUES (?, ?, ?, ?, ?, ?, ?, 'SINGLE', 'TRIAL', 'ACTIVE', ?);", (st.session_state.user_id, n_name, n_name, n_email, n_phone, n_user, hash_password(n_pass), n_gstin))
+                        c.execute("INSERT INTO retailers (assigned_sse_id, store_name, owner_name, email, phone, username, password_hash, store_type, subscription_status, payment_status, gstin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'TRIAL', 'ACTIVE', ?);", (st.session_state.user_id, n_name, n_name, n_email, n_phone, n_user, hash_password(n_pass), n_store_type, n_gstin))
                     else:
                         c.execute("INSERT INTO hierarchy_users (parent_id, role, name, email, phone, username, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?);", (st.session_state.user_id, n_role, n_name, n_email, n_phone, n_user, hash_password(n_pass)))
                     conn.commit()
@@ -226,7 +230,7 @@ elif st.session_state.role in ["COUNTRY_HEAD", "STATE_HEAD", "ZONAL_MANAGER", "S
     with tab3:
         st.subheader("Edit or Delete Downline Users / Retailers")
         downline_nodes = pd.read_sql_query("SELECT id, role, name, username FROM hierarchy_users WHERE parent_id = ?;", conn, params=(st.session_state.user_id,))
-        downline_rets = pd.read_sql_query("SELECT id, store_name as name, 'RETAILER' as role, username, subscription_status, payment_status, gstin FROM retailers WHERE assigned_sse_id = ?;", conn, params=(st.session_state.user_id,))
+        downline_rets = pd.read_sql_query("SELECT id, store_name as name, 'RETAILER' as role, username, subscription_status, payment_status, gstin, store_type FROM retailers WHERE assigned_sse_id = ?;", conn, params=(st.session_state.user_id,))
         
         combined_downline = pd.concat([downline_nodes, downline_rets], ignore_index=True)
         
@@ -237,6 +241,7 @@ elif st.session_state.role in ["COUNTRY_HEAD", "STATE_HEAD", "ZONAL_MANAGER", "S
             
             with st.form("edit_downline_form"):
                 e_name = st.text_input("Name / Store Name", value=selected_member['name'])
+                e_store_type = st.selectbox("Store Type", ["SINGLE", "ENTERPRISE"], index=0 if selected_member.get('store_type', 'SINGLE')=='SINGLE' else 1) if m_role == 'RETAILER' else 'SINGLE'
                 e_gstin = st.text_input("GSTIN", value=selected_member.get('gstin', '') if m_role == 'RETAILER' else '')
                 e_pass = st.text_input("New Password (leave blank to keep unchanged)", type="password")
                 col1, col2 = st.columns(2)
@@ -247,9 +252,9 @@ elif st.session_state.role in ["COUNTRY_HEAD", "STATE_HEAD", "ZONAL_MANAGER", "S
                 if up_btn:
                     if m_role == "RETAILER":
                         if e_pass:
-                            c.execute("UPDATE retailers SET store_name = ?, gstin = ?, password_hash = ? WHERE id = ?;", (e_name, e_gstin, hash_password(e_pass), int(sel_id)))
+                            c.execute("UPDATE retailers SET store_name = ?, store_type = ?, gstin = ?, password_hash = ? WHERE id = ?;", (e_name, e_store_type, e_gstin, hash_password(e_pass), int(sel_id)))
                         else:
-                            c.execute("UPDATE retailers SET store_name = ?, gstin = ? WHERE id = ?;", (e_name, e_gstin, int(sel_id)))
+                            c.execute("UPDATE retailers SET store_name = ?, store_type = ?, gstin = ? WHERE id = ?;", (e_name, e_store_type, e_gstin, int(sel_id)))
                     else:
                         if e_pass:
                             c.execute("UPDATE hierarchy_users SET name = ?, password_hash = ? WHERE id = ?;", (e_name, hash_password(e_pass), int(sel_id)))
