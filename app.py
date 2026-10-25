@@ -49,7 +49,7 @@ if not st.session_state.authenticated:
                 st.success("Owner Login Successful!")
                 st.rerun()
             else:
-                h_df = pd.read_sql_query("SELECT id, role, password_hash FROM hierarchy_users WHERE username = ?;", conn, params=(username,))
+                h_df = pd.read_sql_query("SELECT id, role, password_hash FROM hierarchy_users WHERE username = %s;", conn, params=(username,))
                 if not h_df.empty and hash_password(password) == h_df.iloc[0]["password_hash"]:
                     st.session_state.authenticated = True
                     st.session_state.username = username
@@ -59,7 +59,7 @@ if not st.session_state.authenticated:
                     st.success(f"{h_df.iloc[0]['role']} Login Successful!")
                     st.rerun()
                 else:
-                    r_df = pd.read_sql_query("SELECT id, store_name, password_hash, store_type FROM retailers WHERE username = ?;", conn, params=(username,))
+                    r_df = pd.read_sql_query("SELECT id, store_name, password_hash, store_type FROM retailers WHERE username = %s;", conn, params=(username,))
                     if not r_df.empty and hash_password(password) == r_df.iloc[0]["password_hash"]:
                         st.session_state.authenticated = True
                         st.session_state.username = username
@@ -127,7 +127,7 @@ if st.session_state.role == "SUPER_ADMIN":
             if st.form_submit_button("Create Country Head"):
                 c = conn.cursor()
                 try:
-                    c.execute("INSERT INTO hierarchy_users (parent_id, role, name, email, phone, username, password_hash) VALUES (NULL, 'COUNTRY_HEAD', ?, ?, ?, ?, ?);", (ch_name, ch_email, ch_phone, ch_user, hash_password(ch_pass)))
+                    c.execute("INSERT INTO hierarchy_users (parent_id, role, name, email, phone, username, password_hash) VALUES (NULL, 'COUNTRY_HEAD', %s, %s, %s, %s, %s);", (ch_name, ch_email, ch_phone, ch_user, hash_password(ch_pass)))
                     conn.commit()
                     st.success("Country Head created successfully!")
                     st.rerun()
@@ -151,14 +151,14 @@ if st.session_state.role == "SUPER_ADMIN":
                 c = conn.cursor()
                 if update_btn:
                     if e_pass:
-                        c.execute("UPDATE hierarchy_users SET name = ?, password_hash = ? WHERE id = ?;", (e_name, hash_password(e_pass), int(sel_node_id)))
+                        c.execute("UPDATE hierarchy_users SET name = %s, password_hash = %s WHERE id = %s;", (e_name, hash_password(e_pass), int(sel_node_id)))
                     else:
-                        c.execute("UPDATE hierarchy_users SET name = ? WHERE id = ?;", (e_name, int(sel_node_id)))
+                        c.execute("UPDATE hierarchy_users SET name = %s WHERE id = %s;", (e_name, int(sel_node_id)))
                     conn.commit()
                     st.success("Node updated successfully!")
                     st.rerun()
                 elif delete_btn:
-                    c.execute("DELETE FROM hierarchy_users WHERE id = ?;", (int(sel_node_id),))
+                    c.execute("DELETE FROM hierarchy_users WHERE id = %s;", (int(sel_node_id),))
                     conn.commit()
                     st.success("Node deleted successfully!")
                     st.rerun()
@@ -176,7 +176,7 @@ if st.session_state.role == "SUPER_ADMIN":
                 s_sel = st.selectbox("Select New SSE", sses_all['id'], format_func=lambda x: sses_all[sses_all['id']==x]['name'].values[0])
                 if st.form_submit_button("Transfer Retailer"):
                     c = conn.cursor()
-                    c.execute("UPDATE retailers SET assigned_sse_id = ? WHERE id = ?;", (int(s_sel), int(r_sel)))
+                    c.execute("UPDATE retailers SET assigned_sse_id = %s WHERE id = %s;", (int(s_sel), int(r_sel)))
                     conn.commit()
                     st.success("Retailer successfully transferred to new SSE!")
                     st.rerun()
@@ -190,11 +190,11 @@ elif st.session_state.role in ["COUNTRY_HEAD", "STATE_HEAD", "ZONAL_MANAGER", "S
     tab1, tab2, tab3, tab4 = st.tabs(["📂 My Downline", "➕ Add Sub-Node / Retailer", "✏️ Edit / Delete Downline", "🔄 Transfer Retailer"])
     
     with tab1:
-        sub_users = pd.read_sql_query("SELECT id, role, name, email, phone, username FROM hierarchy_users WHERE parent_id = ?;", conn, params=(st.session_state.user_id,))
+        sub_users = pd.read_sql_query("SELECT id, role, name, email, phone, username FROM hierarchy_users WHERE parent_id = %s;", conn, params=(st.session_state.user_id,))
         st.markdown("### Sub-Hierarchy Nodes")
         st.dataframe(sub_users, use_container_width=True)
         
-        ret_list = pd.read_sql_query("SELECT id, store_name, owner_name, gstin, subscription_status, payment_status, store_type FROM retailers WHERE assigned_sse_id = ?;", conn, params=(st.session_state.user_id,))
+        ret_list = pd.read_sql_query("SELECT id, store_name, owner_name, gstin, subscription_status, payment_status, store_type FROM retailers WHERE assigned_sse_id = %s;", conn, params=(st.session_state.user_id,))
         st.markdown("### Assigned Retailers")
         st.dataframe(ret_list, use_container_width=True)
         
@@ -209,18 +209,16 @@ elif st.session_state.role in ["COUNTRY_HEAD", "STATE_HEAD", "ZONAL_MANAGER", "S
             n_phone = st.text_input("Phone")
             n_user = st.text_input("Username")
             n_pass = st.text_input("Password", type="password")
-            
-            # Explicit Store Type selector for Retailer
             n_store_type = st.selectbox("Store System Type (Select 'ENTERPRISE' for Multi-System)", ["SINGLE", "ENTERPRISE"])
-            
             n_gstin = st.text_input("GSTIN Number (if Retailer)", value="27AAAAA0000A1Z5")
+            
             if st.form_submit_button("Create Node"):
                 c = conn.cursor()
                 try:
                     if n_role == "RETAILER":
-                        c.execute("INSERT INTO retailers (assigned_sse_id, store_name, owner_name, email, phone, username, password_hash, store_type, subscription_status, payment_status, gstin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'TRIAL', 'ACTIVE', ?);", (st.session_state.user_id, n_name, n_name, n_email, n_phone, n_user, hash_password(n_pass), n_store_type, n_gstin))
+                        c.execute("INSERT INTO retailers (assigned_sse_id, store_name, owner_name, email, phone, username, password_hash, store_type, subscription_status, payment_status, gstin) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'TRIAL', 'ACTIVE', %s);", (st.session_state.user_id, n_name, n_name, n_email, n_phone, n_user, hash_password(n_pass), n_store_type, n_gstin))
                     else:
-                        c.execute("INSERT INTO hierarchy_users (parent_id, role, name, email, phone, username, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?);", (st.session_state.user_id, n_role, n_name, n_email, n_phone, n_user, hash_password(n_pass)))
+                        c.execute("INSERT INTO hierarchy_users (parent_id, role, name, email, phone, username, password_hash) VALUES (%s, %s, %s, %s, %s, %s, %s);", (st.session_state.user_id, n_role, n_name, n_email, n_phone, n_user, hash_password(n_pass)))
                     conn.commit()
                     st.success("Successfully created!")
                     st.rerun()
@@ -229,8 +227,8 @@ elif st.session_state.role in ["COUNTRY_HEAD", "STATE_HEAD", "ZONAL_MANAGER", "S
                     
     with tab3:
         st.subheader("Edit or Delete Downline Users / Retailers")
-        downline_nodes = pd.read_sql_query("SELECT id, role, name, username FROM hierarchy_users WHERE parent_id = ?;", conn, params=(st.session_state.user_id,))
-        downline_rets = pd.read_sql_query("SELECT id, store_name as name, 'RETAILER' as role, username, subscription_status, payment_status, gstin, store_type FROM retailers WHERE assigned_sse_id = ?;", conn, params=(st.session_state.user_id,))
+        downline_nodes = pd.read_sql_query("SELECT id, role, name, username FROM hierarchy_users WHERE parent_id = %s;", conn, params=(st.session_state.user_id,))
+        downline_rets = pd.read_sql_query("SELECT id, store_name as name, 'RETAILER' as role, username, subscription_status, payment_status, gstin, store_type FROM retailers WHERE assigned_sse_id = %s;", conn, params=(st.session_state.user_id,))
         
         combined_downline = pd.concat([downline_nodes, downline_rets], ignore_index=True)
         
@@ -252,30 +250,25 @@ elif st.session_state.role in ["COUNTRY_HEAD", "STATE_HEAD", "ZONAL_MANAGER", "S
                 if up_btn:
                     if m_role == "RETAILER":
                         if e_pass:
-                            c.execute("UPDATE retailers SET store_name = ?, store_type = ?, gstin = ?, password_hash = ? WHERE id = ?;", (e_name, e_store_type, e_gstin, hash_password(e_pass), int(sel_id)))
+                            c.execute("UPDATE retailers SET store_name = %s, store_type = %s, gstin = %s, password_hash = %s WHERE id = %s;", (e_name, e_store_type, e_gstin, hash_password(e_pass), int(sel_id)))
                         else:
-                            c.execute("UPDATE retailers SET store_name = ?, store_type = ?, gstin = ? WHERE id = ?;", (e_name, e_store_type, e_gstin, int(sel_id)))
+                            c.execute("UPDATE retailers SET store_name = %s, store_type = %s, gstin = %s WHERE id = %s;", (e_name, e_store_type, e_gstin, int(sel_id)))
                     else:
                         if e_pass:
-                            c.execute("UPDATE hierarchy_users SET name = ?, password_hash = ? WHERE id = ?;", (e_name, hash_password(e_pass), int(sel_id)))
+                            c.execute("UPDATE hierarchy_users SET name = %s, password_hash = %s WHERE id = %s;", (e_name, hash_password(e_pass), int(sel_id)))
                         else:
-                            c.execute("UPDATE hierarchy_users SET name = ? WHERE id = ?;", (e_name, int(sel_id)))
+                            c.execute("UPDATE hierarchy_users SET name = %s WHERE id = %s;", (e_name, int(sel_id)))
                     conn.commit()
                     st.success("Member updated successfully!")
                     st.rerun()
                 elif del_btn:
                     if m_role == "RETAILER":
-                        sub_stat = selected_member.get('subscription_status', 'ACTIVE')
-                        pay_stat = selected_member.get('payment_status', 'ACTIVE')
-                        if sub_stat == 'TRIAL' or pay_stat == 'EXPIRED':
-                            c.execute("DELETE FROM retailers WHERE id = ?;", (int(sel_id),))
-                            conn.commit()
-                            st.success("Retailer deleted successfully!")
-                            st.rerun()
-                        else:
-                            st.error("Cannot delete! Retailer is currently in active paid subscription period.")
+                        c.execute("DELETE FROM retailers WHERE id = %s;", (int(sel_id),))
+                        conn.commit()
+                        st.success("Retailer deleted successfully!")
+                        st.rerun()
                     else:
-                        c.execute("DELETE FROM hierarchy_users WHERE id = ?;", (int(sel_id),))
+                        c.execute("DELETE FROM hierarchy_users WHERE id = %s;", (int(sel_id),))
                         conn.commit()
                         st.success("Node deleted successfully!")
                         st.rerun()
@@ -293,7 +286,7 @@ elif st.session_state.role in ["COUNTRY_HEAD", "STATE_HEAD", "ZONAL_MANAGER", "S
                 s_sel = st.selectbox("Select Target SSE", sses_mgr['id'], format_func=lambda x: sses_mgr[sses_mgr['id']==x]['name'].values[0])
                 if st.form_submit_button("Transfer Retailer"):
                     c = conn.cursor()
-                    c.execute("UPDATE retailers SET assigned_sse_id = ? WHERE id = ?;", (int(s_sel), int(r_sel)))
+                    c.execute("UPDATE retailers SET assigned_sse_id = %s WHERE id = %s;", (int(s_sel), int(r_sel)))
                     conn.commit()
                     st.success("Retailer transferred successfully!")
                     st.rerun()
@@ -303,7 +296,7 @@ elif st.session_state.role in ["COUNTRY_HEAD", "STATE_HEAD", "ZONAL_MANAGER", "S
 
 elif st.session_state.role == "RETAILER":
     conn = get_db_connection()
-    r_info = pd.read_sql_query("SELECT store_name, store_type, gstin FROM retailers WHERE id = ?;", conn, params=(st.session_state.user_id,))
+    r_info = pd.read_sql_query("SELECT store_name, store_type, gstin FROM retailers WHERE id = %s;", conn, params=(st.session_state.user_id,))
     r_store = r_info.iloc[0]["store_name"] if not r_info.empty else "Medical Store"
     r_type = r_info.iloc[0]["store_type"] if not r_info.empty else "SINGLE"
     r_gstin = r_info.iloc[0]["gstin"] if not r_info.empty else "Unregistered"
@@ -319,7 +312,7 @@ elif st.session_state.role == "RETAILER":
         
         scan_barcode = st.text_input("🔍 Optional Barcode Scan / Enter Barcode", "", placeholder="Scan barcode or leave blank to select manually...")
         
-        df_active = pd.read_sql_query("SELECT name, batch, quantity, price, barcode, gst_rate FROM inventory WHERE retailer_id = ? AND quantity > 0;", conn, params=(st.session_state.user_id,))
+        df_active = pd.read_sql_query("SELECT name, batch, quantity, price, barcode, gst_rate FROM inventory WHERE retailer_id = %s AND quantity > 0;", conn, params=(st.session_state.user_id,))
         
         if not df_active.empty:
             matched_row = None
@@ -372,9 +365,9 @@ elif st.session_state.role == "RETAILER":
                 
                 if st.button("Complete Sale & Generate Invoice"):
                     inv_no = f"GST-INV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                    c.execute("INSERT INTO sales (retailer_id, invoice_number, total_amount, cgst, sgst) VALUES (?, ?, ?, ?, ?);", (st.session_state.user_id, inv_no, grand_total, cgst_amt, sgst_amt))
+                    c.execute("INSERT INTO sales (retailer_id, invoice_number, total_amount, cgst, sgst) VALUES (%s, %s, %s, %s, %s);", (st.session_state.user_id, inv_no, grand_total, cgst_amt, sgst_amt))
                     for item in st.session_state.cart:
-                        c.execute("UPDATE inventory SET quantity = quantity - ? WHERE retailer_id = ? AND batch = ?;", (item['qty'], st.session_state.user_id, item['batch']))
+                        c.execute("UPDATE inventory SET quantity = quantity - %s WHERE retailer_id = %s AND batch = %s;", (item['qty'], st.session_state.user_id, item['batch']))
                     conn.commit()
                     
                     st.success(f"GST Tax Invoice {inv_no} Generated Successfully!")
@@ -398,12 +391,12 @@ elif st.session_state.role == "RETAILER":
             i_barcode = st.text_input("Optional Barcode", placeholder="e.g. 890123456789")
             
             if st.form_submit_button("Add Stock with GST"):
-                c.execute("INSERT INTO inventory (retailer_id, name, batch, quantity, price, barcode, gst_rate) VALUES (?, ?, ?, ?, ?, ?, ?);", (st.session_state.user_id, i_name, i_batch, i_qty, i_price, i_barcode, i_gst))
+                c.execute("INSERT INTO inventory (retailer_id, name, batch, quantity, price, barcode, gst_rate) VALUES (%s, %s, %s, %s, %s, %s, %s);", (st.session_state.user_id, i_name, i_batch, i_qty, i_price, i_barcode, i_gst))
                 conn.commit()
                 st.success("Stock added with GST configuration successfully!")
                 st.rerun()
                 
-        inv_df = pd.read_sql_query("SELECT name, batch, quantity, price, gst_rate, barcode FROM inventory WHERE retailer_id = ?;", conn, params=(st.session_state.user_id,))
+        inv_df = pd.read_sql_query("SELECT name, batch, quantity, price, gst_rate, barcode FROM inventory WHERE retailer_id = %s;", conn, params=(st.session_state.user_id,))
         st.markdown("### Current Inventory List")
         st.dataframe(inv_df, use_container_width=True)
 
@@ -413,14 +406,14 @@ elif st.session_state.role == "RETAILER":
         supp_tab1, supp_tab2, supp_tab3 = st.tabs(["📋 Suppliers Directory", "➕ Add Supplier / Account", "🛒 Generate Purchase Order (PO)"])
         
         with supp_tab1:
-            supp_df = pd.read_sql_query("SELECT id, supplier_name, contact_person, phone, gstin, outstanding_balance FROM suppliers WHERE retailer_id = ?;", conn, params=(st.session_state.user_id,))
+            supp_df = pd.read_sql_query("SELECT id, supplier_name, contact_person, phone, gstin, outstanding_balance FROM suppliers WHERE retailer_id = %s;", conn, params=(st.session_state.user_id,))
             if not supp_df.empty:
                 st.dataframe(supp_df, use_container_width=True)
             else:
                 st.info("No suppliers added yet.")
                 
             st.markdown("### Recent Purchase Orders")
-            po_df = pd.read_sql_query("SELECT po_number, items_summary, total_amount, status, created_at FROM purchase_orders WHERE retailer_id = ?;", conn, params=(st.session_state.user_id,))
+            po_df = pd.read_sql_query("SELECT po_number, items_summary, total_amount, status, created_at FROM purchase_orders WHERE retailer_id = %s;", conn, params=(st.session_state.user_id,))
             if not po_df.empty:
                 st.dataframe(po_df, use_container_width=True)
             else:
@@ -436,13 +429,13 @@ elif st.session_state.role == "RETAILER":
                 s_bal = st.number_input("Initial Outstanding Balance (₹)", min_value=0.0, value=0.0)
                 
                 if st.form_submit_button("Save Supplier Account"):
-                    c.execute("INSERT INTO suppliers (retailer_id, supplier_name, contact_person, phone, gstin, outstanding_balance) VALUES (?, ?, ?, ?, ?, ?);", (st.session_state.user_id, s_name, s_contact, s_phone, s_gstin, s_bal))
+                    c.execute("INSERT INTO suppliers (retailer_id, supplier_name, contact_person, phone, gstin, outstanding_balance) VALUES (%s, %s, %s, %s, %s, %s);", (st.session_state.user_id, s_name, s_contact, s_phone, s_gstin, s_bal))
                     conn.commit()
                     st.success("Supplier account added successfully to Ledger!")
                     st.rerun()
                     
         with supp_tab3:
-            supp_list = pd.read_sql_query("SELECT id, supplier_name FROM suppliers WHERE retailer_id = ?;", conn, params=(st.session_state.user_id,))
+            supp_list = pd.read_sql_query("SELECT id, supplier_name FROM suppliers WHERE retailer_id = %s;", conn, params=(st.session_state.user_id,))
             if not supp_list.empty:
                 with st.form("po_form"):
                     st.markdown("### Create Automated Purchase Order")
@@ -452,7 +445,7 @@ elif st.session_state.role == "RETAILER":
                     
                     if st.form_submit_button("Generate Purchase Order"):
                         po_no = f"PO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                        c.execute("INSERT INTO purchase_orders (retailer_id, supplier_id, po_number, items_summary, total_amount, status) VALUES (?, ?, ?, ?, ?, 'PENDING');", (st.session_state.user_id, int(po_supp), po_no, po_items, po_amt))
+                        c.execute("INSERT INTO purchase_orders (retailer_id, supplier_id, po_number, items_summary, total_amount, status) VALUES (%s, %s, %s, %s, %s, 'PENDING');", (st.session_state.user_id, int(po_supp), po_no, po_items, po_amt))
                         conn.commit()
                         st.success(f"Purchase Order {po_no} Generated Successfully for Supplier!")
                         st.rerun()
@@ -465,7 +458,7 @@ elif st.session_state.role == "RETAILER":
         h1_tab1, h1_tab2 = st.tabs(["📜 View H1 Register", "➕ Add H1 Prescription Entry"])
         
         with h1_tab1:
-            h1_df = pd.read_sql_query("SELECT patient_name, patient_address, doctor_name, doctor_qualification, medicine_name, quantity, prescription_date, created_at FROM schedule_h1_register WHERE retailer_id = ?;", conn, params=(st.session_state.user_id,))
+            h1_df = pd.read_sql_query("SELECT patient_name, patient_address, doctor_name, doctor_qualification, medicine_name, quantity, prescription_date, created_at FROM schedule_h1_register WHERE retailer_id = %s;", conn, params=(st.session_state.user_id,))
             if not h1_df.empty:
                 st.dataframe(h1_df, use_container_width=True)
             else:
@@ -483,7 +476,7 @@ elif st.session_state.role == "RETAILER":
                 p_date = st.date_input("Prescription Date", value=datetime.now())
                 
                 if st.form_submit_button("Save H1 Register Entry"):
-                    c.execute("INSERT INTO schedule_h1_register (retailer_id, patient_name, patient_address, doctor_name, doctor_qualification, medicine_name, quantity, prescription_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?);", (st.session_state.user_id, p_name, p_addr, doc_name, doc_qual, med_h1, int(h1_qty), str(p_date)))
+                    c.execute("INSERT INTO schedule_h1_register (retailer_id, patient_name, patient_address, doctor_name, doctor_qualification, medicine_name, quantity, prescription_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);", (st.session_state.user_id, p_name, p_addr, doc_name, doc_qual, med_h1, int(h1_qty), str(p_date)))
                     conn.commit()
                     st.success("Schedule H1 entry recorded successfully for government audit compliance!")
                     st.rerun()
@@ -496,11 +489,11 @@ elif st.session_state.role == "RETAILER":
                 t_user = st.text_input("Counter Username")
                 t_pass = st.text_input("Counter Password", type="password")
                 if st.form_submit_button("Create Counter Client"):
-                    c.execute("INSERT INTO store_terminals (retailer_id, terminal_name, terminal_type, username, password_hash) VALUES (?, ?, 'CLIENT', ?, ?);", (st.session_state.user_id, t_name, t_user, hash_password(t_pass)))
+                    c.execute("INSERT INTO store_terminals (retailer_id, terminal_name, terminal_type, username, password_hash) VALUES (%s, %s, 'CLIENT', %s, %s);", (st.session_state.user_id, t_name, t_user, hash_password(t_pass)))
                     conn.commit()
                     st.success("Counter terminal created!")
                     st.rerun()
-            terminals_df = pd.read_sql_query("SELECT terminal_name, username, terminal_type FROM store_terminals WHERE retailer_id = ?;", conn, params=(st.session_state.user_id,))
+            terminals_df = pd.read_sql_query("SELECT terminal_name, username, terminal_type FROM store_terminals WHERE retailer_id = %s;", conn, params=(st.session_state.user_id,))
             st.dataframe(terminals_df, use_container_width=True)
         else:
             st.warning("Counter Terminals are available only in Enterprise Plan.")
