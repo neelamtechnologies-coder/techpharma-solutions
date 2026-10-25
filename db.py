@@ -1,6 +1,7 @@
-import sqlite3
 import os
 import hashlib
+import psycopg2
+import streamlit as st
 
 def setup_local_environment():
     try:
@@ -12,10 +13,14 @@ def setup_local_environment():
     return folder_path
 
 LOCAL_FOLDER = setup_local_environment()
-DB_FILE = os.path.join(LOCAL_FOLDER, "medical_store.db")
 
+# Cloud PostgreSQL Connection URL (Aap yahan Supabase ya Neon ka free URL daal sakte hain)
+# Streamlit secrets ya direct connection string use kar sakte hain:
 def get_db_connection():
-    return sqlite3.connect(DB_FILE, check_same_thread=False)
+    # Agar Streamlit secrets mein DB URL diya hai toh wo use karega, nahi toh fallback
+    db_url = st.secrets.get("DATABASE_URL", "postgresql://postgres:your_password@db.supabase.co:5432/postgres")
+    conn = psycopg2.connect(db_url, sslmode='require')
+    return conn
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
@@ -26,7 +31,7 @@ def init_db():
         c = conn.cursor()
         
         c.execute("""CREATE TABLE IF NOT EXISTS system_config (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            id SERIAL PRIMARY KEY, 
             company_name TEXT DEFAULT 'Neelam Technologies', 
             super_admin_username TEXT DEFAULT 'admin', 
             super_admin_password_hash TEXT DEFAULT '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', 
@@ -36,7 +41,7 @@ def init_db():
         );""")
         
         c.execute("""CREATE TABLE IF NOT EXISTS hierarchy_users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             parent_id INTEGER,
             role TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -44,11 +49,11 @@ def init_db():
             phone TEXT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT (datetime('now', '+5 hours', '+30 minutes'))
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );""")
 
         c.execute("""CREATE TABLE IF NOT EXISTS retailers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            id SERIAL PRIMARY KEY, 
             assigned_sse_id INTEGER, 
             store_name TEXT NOT NULL, 
             owner_name TEXT, 
@@ -58,13 +63,13 @@ def init_db():
             password_hash TEXT NOT NULL, 
             store_type TEXT DEFAULT 'SINGLE', 
             subscription_status TEXT DEFAULT 'TRIAL', 
-            plan_expiry_date TIMESTAMP DEFAULT (datetime('now', '+5 hours', '+30 minutes', '+30 days')), 
+            plan_expiry_date TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '30 days'), 
             payment_status TEXT DEFAULT 'ACTIVE',
             gstin TEXT DEFAULT '27AAAAA0000A1Z5'
         );""")
         
         c.execute("""CREATE TABLE IF NOT EXISTS store_terminals (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            id SERIAL PRIMARY KEY, 
             retailer_id INTEGER, 
             terminal_name TEXT NOT NULL, 
             terminal_type TEXT DEFAULT 'CLIENT', 
@@ -73,7 +78,7 @@ def init_db():
         );""")
         
         c.execute("""CREATE TABLE IF NOT EXISTS inventory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            id SERIAL PRIMARY KEY, 
             retailer_id INTEGER, 
             name TEXT NOT NULL, 
             batch TEXT, 
@@ -83,41 +88,40 @@ def init_db():
             gst_rate REAL DEFAULT 12.0
         );""")
         
-        c.execute("""CREATE TABLE IF NOT EXISTS sales (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        c.execute("""SQL""" if False else """CREATE TABLE IF NOT EXISTS sales (
+            id SERIAL PRIMARY KEY, 
             retailer_id INTEGER, 
             invoice_number TEXT NOT NULL, 
             total_amount REAL NOT NULL, 
             cgst REAL DEFAULT 0.0,
             sgst REAL DEFAULT 0.0,
-            created_at TIMESTAMP DEFAULT (datetime('now', '+5 hours', '+30 minutes'))
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );""")
 
         c.execute("""CREATE TABLE IF NOT EXISTS suppliers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             retailer_id INTEGER,
             supplier_name TEXT NOT NULL,
             contact_person TEXT,
             phone TEXT,
             gstin TEXT,
             outstanding_balance REAL DEFAULT 0.0,
-            created_at TIMESTAMP DEFAULT (datetime('now', '+5 hours', '+30 minutes'))
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );""")
 
         c.execute("""CREATE TABLE IF NOT EXISTS purchase_orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             retailer_id INTEGER,
             supplier_id INTEGER,
             po_number TEXT NOT NULL,
             items_summary TEXT NOT NULL,
             total_amount REAL NOT NULL,
             status TEXT DEFAULT 'PENDING',
-            created_at TIMESTAMP DEFAULT (datetime('now', '+5 hours', '+30 minutes'))
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );""")
 
-        # Schedule H1 Register Table for Legal Compliance
         c.execute("""CREATE TABLE IF NOT EXISTS schedule_h1_register (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             retailer_id INTEGER,
             patient_name TEXT NOT NULL,
             patient_address TEXT,
@@ -126,7 +130,7 @@ def init_db():
             medicine_name TEXT NOT NULL,
             quantity INTEGER NOT NULL,
             prescription_date TEXT,
-            created_at TIMESTAMP DEFAULT (datetime('now', '+5 hours', '+30 minutes'))
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );""")
         
         conn.commit()
