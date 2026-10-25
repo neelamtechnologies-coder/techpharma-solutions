@@ -3,22 +3,11 @@ import hashlib
 import psycopg2
 import streamlit as st
 
-def setup_local_environment():
-    try:
-        folder_path = r"C:\PharmaFlow_Data"
-        os.makedirs(folder_path, exist_ok=True)
-    except Exception:
-        folder_path = os.path.join(os.path.expanduser("~"), "PharmaFlow_Data")
-        os.makedirs(folder_path, exist_ok=True)
-    return folder_path
-
-LOCAL_FOLDER = setup_local_environment()
-
-# Cloud PostgreSQL Connection URL (Aap yahan Supabase ya Neon ka free URL daal sakte hain)
-# Streamlit secrets ya direct connection string use kar sakte hain:
 def get_db_connection():
-    # Agar Streamlit secrets mein DB URL diya hai toh wo use karega, nahi toh fallback
-    db_url = st.secrets.get("DATABASE_URL", "postgresql://postgres:your_password@db.supabase.co:5432/postgres")
+    db_url = st.secrets.get("DATABASE_URL", "")
+    if not db_url:
+        st.error("DATABASE_URL is missing in Streamlit Secrets! Please add your Supabase connection string.")
+        st.stop()
     conn = psycopg2.connect(db_url, sslmode='require')
     return conn
 
@@ -88,7 +77,7 @@ def init_db():
             gst_rate REAL DEFAULT 12.0
         );""")
         
-        c.execute("""SQL""" if False else """CREATE TABLE IF NOT EXISTS sales (
+        c.execute("""CREATE TABLE IF NOT EXISTS sales (
             id SERIAL PRIMARY KEY, 
             retailer_id INTEGER, 
             invoice_number TEXT NOT NULL, 
@@ -142,4 +131,7 @@ def init_db():
 
         conn.close()
     except Exception as e:
-        print(f"Database Init Error: {e}")
+        st.error(f"Database Init Error: {e}")
+
+def setup_local_environment():
+    pass
