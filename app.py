@@ -1,6 +1,6 @@
 import streamlit as st
 import psycopg2
-import os
+import pandas as pd
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -26,9 +26,9 @@ def init_db():
         return
     cur = conn.cursor()
     try:
-        # Users / Hierarchy Table
+        # Users / Hierarchy Table (v2 with all required columns)
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS hierarchy_users (
+            CREATE TABLE IF NOT EXISTS hierarchy_users_v2 (
                 id SERIAL PRIMARY KEY,
                 role TEXT NOT NULL,
                 name TEXT NOT NULL,
@@ -63,10 +63,10 @@ def init_db():
         conn.commit()
 
         # Insert Default Super Admin if not exists
-        cur.execute("SELECT COUNT(*) FROM hierarchy_users WHERE username = 'admin';")
+        cur.execute("SELECT COUNT(*) FROM hierarchy_users_v2 WHERE username = 'admin';")
         if cur.fetchone()[0] == 0:
             cur.execute("""
-                INSERT INTO hierarchy_users (role, name, email, phone, username, password)
+                INSERT INTO hierarchy_users_v2 (role, name, email, phone, username, password)
                 VALUES (%s, %s, %s, %s, %s, %s);
             """, ("SUPER_ADMIN", "System Owner", "admin@techpharma.com", "9999999999", "admin", "admin123"))
             conn.commit()
@@ -113,7 +113,7 @@ if not st.session_state.logged_in:
             conn = get_db_connection()
             if conn:
                 cur = conn.cursor()
-                cur.execute("SELECT role, password FROM hierarchy_users WHERE username = %s;", (username,))
+                cur.execute("SELECT role, password FROM hierarchy_users_v2 WHERE username = %s;", (username,))
                 user = cur.fetchone()
                 cur.close()
                 conn.close()
@@ -150,12 +150,11 @@ else:
             conn = get_db_connection()
             if conn:
                 cur = conn.cursor()
-                cur.execute("SELECT id, role, name, email, phone, username FROM hierarchy_users;")
+                cur.execute("SELECT id, role, name, email, phone, username FROM hierarchy_users_v2;")
                 members = cur.fetchall()
                 
                 st.markdown("### Hierarchy Members")
                 if members:
-                    import pandas as pd
                     df = pd.DataFrame(members, columns=["ID", "Role", "Name", "Email", "Phone", "Username"])
                     st.dataframe(df, use_container_width=True)
                 else:
@@ -191,7 +190,7 @@ else:
                             cur = conn.cursor()
                             try:
                                 cur.execute("""
-                                    INSERT INTO hierarchy_users (role, name, email, phone, username, password)
+                                    INSERT INTO hierarchy_users_v2 (role, name, email, phone, username, password)
                                     VALUES (%s, %s, %s, %s, %s, %s);
                                 """, (new_role, new_name, new_email, new_phone, new_uname, new_upass))
                                 conn.commit()
@@ -243,7 +242,7 @@ else:
                         
                         # Update password if provided
                         if new_admin_pass:
-                            cur.execute("UPDATE hierarchy_users SET password = %s WHERE username = 'admin';", (new_admin_pass,))
+                            cur.execute("UPDATE hierarchy_users_v2 SET password = %s WHERE username = 'admin';", (new_admin_pass,))
                         
                         conn.commit()
                         st.success("Whiteboard settings successfully updated and saved to Cloud Database! 🎉")
