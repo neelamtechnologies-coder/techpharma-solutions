@@ -16,7 +16,6 @@ def init_db():
         return
     cur = conn.cursor()
     try:
-        # Hierarchy Users Table supporting exact enterprise chain with parent references
         cur.execute("""
             CREATE TABLE IF NOT EXISTS enterprise_hierarchy (
                 id SERIAL PRIMARY KEY,
@@ -30,7 +29,6 @@ def init_db():
             );
         """)
         
-        # Whiteboard Settings Table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS whiteboard_settings (
                 id SERIAL PRIMARY KEY,
@@ -39,7 +37,6 @@ def init_db():
             );
         """)
 
-        # Retailers & Terminals Table with Demo & Validity tracking
         cur.execute("""
             CREATE TABLE IF NOT EXISTS enterprise_retailers (
                 id SERIAL PRIMARY KEY,
@@ -51,13 +48,13 @@ def init_db():
                 sse_id INTEGER REFERENCES enterprise_hierarchy(id) ON DELETE SET NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 subscription_expiry TIMESTAMP,
-                is_demo BOOLEAN DEFAULT TRUE
+                is_demo BOOLEAN DEFAULT TRUE,
+                system_type TEXT DEFAULT 'Single System'
             );
         """)
         
         conn.commit()
 
-        # Insert Default Super Admin if not exists
         cur.execute("SELECT COUNT(*) FROM enterprise_hierarchy WHERE username = 'admin';")
         if cur.fetchone()[0] == 0:
             cur.execute("""
@@ -66,12 +63,18 @@ def init_db():
             """, ("OWNER", "System Owner", "admin@techpharma.com", "9999999999", "admin", "admin123", None))
             conn.commit()
 
-        # Insert Default Whiteboard Settings if not exists
-        cur.execute("SELECT COUNT(*) FROM whiteboard_settings WHERE key = 'monthly_rate';")
-        if cur.fetchone()[0] == 0:
-            cur.execute("INSERT INTO whiteboard_settings (key, value) VALUES ('monthly_rate', '999');")
-            cur.execute("INSERT INTO whiteboard_settings (key, value) VALUES ('yearly_rate', '9999');")
-            conn.commit()
+        # Default Whiteboard Settings (Single & Multi-System Rates)
+        defaults = [
+            ('monthly_rate', '999'),
+            ('yearly_rate', '9999'),
+            ('multi_monthly_rate', '1999'),
+            ('multi_yearly_rate', '19999')
+        ]
+        for key, val in defaults:
+            cur.execute("SELECT COUNT(*) FROM whiteboard_settings WHERE key = %s;", (key,))
+            if cur.fetchone()[0] == 0:
+                cur.execute("INSERT INTO whiteboard_settings (key, value) VALUES (%s, %s);", (key, val))
+                conn.commit()
 
     except Exception as e:
         st.error(f"Table Init Error: {e}")
